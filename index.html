@@ -30,63 +30,69 @@
 
 <div id="forum-list">正在获取最新内容...</div>
 
-<div class="pagination">
+<div class="pagination" style="display:none;" id="page-ctrl">
     <button class="page-btn" onclick="changePage(-1)">上一页</button>
     <span id="page-num">第 1 页</span>
     <button class="page-btn" onclick="changePage(1)">下一页</button>
 </div>
 
 <script>
-    const SB_URL = 'https://hjmpzvqehyxlsnjieihx.supabase.co';
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqbXB6dnFlaHhsc25qaWVpaHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc0Mjg5OTMyOSwiZXhwIjoyMDU4NDc1MzI5fQ.i3TuZ1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqbXB6dnFlaHhsc25qaWVpaHgiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc0Mjg5OTMyOSwiZXhwIjoyMDU4NDc1MzI5fQ.U35m9sZSI6ImFub24iLCJpYXQiOjE3NDI4OTkzMjksImV4cCI6MjA1ODQ3NTMyOX0.9sEHRljY14jgsOnEATFNPJYUAaj7BkxSqvCp6Ftls';
-    
-    const supabase = Object.values(supabase)[0].createClient(SB_URL, SB_KEY);
+    // 使用你刚发给我的正确 Key
+    const SB_URL = 'https://hjmpzvqehyxHlsnjieihx.supabase.co'; 
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhqbXB6dnFlaHl4bHNuamllaWh4Iiwicm9sZSI6Imub24iLCJpYXQiOjE3NzUyNjE4OTEsImV4cCI6MjA5MDgzNzg5MX0.9sEHRljY14jgsONe9ATFnPJYUAaj7BxCKsqvCp6Ft1s';
+
+    let supabase;
+    try {
+        supabase = supabase.createClient(SB_URL, SB_KEY);
+    } catch(e) {
+        supabase = window.supabase.createClient(SB_URL, SB_KEY);
+    }
 
     let currentPage = 1;
-    const pageSize = 10;
+    const pageSize = 15;
 
     async function fetchPosts() {
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize - 1;
 
-        // 核心修改：适配 forum_posts 表并增加 priority 排序
         const { data, error } = await supabase
             .from('forum_posts')
             .select('*')
-            .order('priority', { ascending: false }) // 优先级高的（如管理员 999）排前面
-            .order('created_at', { ascending: false }) // 同优先级按时间倒序
+            .order('priority', { ascending: false })
+            .order('created_at', { ascending: false })
             .range(start, end);
 
         if (error) {
-            console.error('获取失败:', error);
-            document.getElementById('forum-list').innerText = '加载失败，请检查数据库。';
+            document.getElementById('forum-list').innerText = '加载失败: ' + error.message;
             return;
         }
 
         const listDiv = document.getElementById('forum-list');
-        listDiv.innerHTML = data.map(post => `
-            <div class="post-item">
-                <div class="post-meta">
-                    <div>
-                        ${post.nickname === '管理员' || (post.priority && post.priority >= 900) ? '<span class="admin-badge">管理员</span>' : ''}
-                        <strong style="color:#555">${post.nickname || '匿名'}</strong>
+        if (data.length === 0 && currentPage === 1) {
+            listDiv.innerText = '暂无内容，快来发布第一条吧！';
+        } else {
+            listDiv.innerHTML = data.map(post => `
+                <div class="post-item">
+                    <div class="post-meta">
+                        <div>
+                            ${post.nickname === '管理员' || post.priority >= 900 ? '<span class="admin-badge">管理员</span>' : ''}
+                            <strong style="color:#555">${post.nickname || '匿名'}</strong>
+                        </div>
+                        <span style="color:#bbb">${new Date(post.created_at).toLocaleString()}</span>
                     </div>
-                    <span style="color:#bbb">${new Date(post.created_at).toLocaleString()}</span>
+                    <div class="post-content">${post.content}</div>
                 </div>
-                <div class="post-content">${post.content}</div>
-            </div>
-        `).join('');
-        
+            `).join('');
+            document.getElementById('page-ctrl').style.display = 'flex';
+        }
         document.getElementById('page-num').innerText = `第 ${currentPage} 页`;
     }
 
     async function submitPost() {
         const nickname = document.getElementById('nickname').value.trim() || '匿名';
         const content = document.getElementById('content').value.trim();
-
         if (!content) return alert('请输入内容');
 
-        // 如果昵称是管理员，自动给 999 权重，否则给 0
         const priorityValue = (nickname === '管理员') ? 999 : 0;
 
         const { error } = await supabase
@@ -97,6 +103,7 @@
             alert('发布失败: ' + error.message);
         } else {
             document.getElementById('content').value = '';
+            currentPage = 1;
             fetchPosts();
         }
     }
@@ -105,10 +112,10 @@
         if (currentPage + dir < 1) return;
         currentPage += dir;
         fetchPosts();
+        window.scrollTo(0,0);
     }
 
     window.onload = fetchPosts;
 </script>
-
 </body>
 </html>
